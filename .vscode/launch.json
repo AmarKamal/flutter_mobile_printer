@@ -5,6 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "imran",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "26eaa079"
+        },
+        {
             "name": "amar",
             "request": "launch",
             "type": "dart",

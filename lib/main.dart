@@ -1,8 +1,10 @@
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:bluetooth_print/bluetooth_print.dart';
 import 'package:bluetooth_print/bluetooth_print_model.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 void main() => runApp(const MyApp());
 
@@ -66,6 +68,94 @@ class MyAppState extends State<MyApp> {
     }
   }
 
+
+  final Map<String, dynamic> receiptData = {
+    'leftColumn': [
+      'USER001',
+      '123 Street Name',
+      '+1234567890',
+      DateTime.now().toLocal().toString().split('.')[0],  // Properly formatted date
+    ],
+    'rightColumn': 'assets/logo/icon_launcher.png'
+  };
+
+
+String padRight(String text, int width) {
+  return text.length < width ? text.padRight(width) : text.substring(0, width);
+}
+
+
+Future<List<LineText>> getReceiptLayout(Map<String, dynamic> data) async {
+  List<LineText> list = [];
+  try {    
+    try {
+      ByteData logoData = await rootBundle.load(data['rightColumn']);
+      List<int> imageBytes = logoData.buffer.asUint8List(
+        logoData.offsetInBytes,
+        logoData.lengthInBytes
+      );
+      String base64Image = base64Encode(imageBytes);
+
+      list.add(LineText(
+        type: LineText.TYPE_IMAGE,
+        content: base64Image,                                
+        width: 120,
+        height: 120,
+        align: LineText.ALIGN_CENTER,
+        linefeed: 1  // Feed line after logo
+      ));
+
+
+   for (int i = 0; i < data['leftColumn'].length; i++) {
+      list.add(LineText(
+        type: LineText.TYPE_TEXT,
+        content: '${data['leftColumn'][i]}\n',       
+        align: LineText.ALIGN_CENTER,
+        linefeed: 0  
+      ));
+    }
+    } catch (e) {
+      print('Logo loading error: $e');      
+    }
+
+    //    // Method 1: Using relativeX for inline positioning
+    // list.add(LineText(
+    //   type: LineText.TYPE_TEXT,
+    //   content: 'Item',
+    //   align: LineText.ALIGN_LEFT,
+    //   linefeed: 0  // Don't move to next line yet
+    // ));
+    
+    // list.add(LineText(
+    //   type: LineText.TYPE_TEXT,
+    //   content: 'Qty',
+    //   relativeX: 150,  // Position relative to previous content
+    //   align: LineText.ALIGN_LEFT,
+    //   linefeed: 0
+    // ));
+    
+    // list.add(LineText(
+    //   type: LineText.TYPE_TEXT,
+    //   content: 'Price',
+    //   relativeX: 100,  // Position relative to previous content
+    //   align: LineText.ALIGN_LEFT,
+    //   linefeed: 1  // Now move to next line
+    // ));
+                              
+
+  } catch (e) {
+    print('Layout error: $e');
+    // Fallback layout
+    list.add(LineText(
+      type: LineText.TYPE_TEXT,
+      content: 'Error in layout: $e',
+      align: LineText.ALIGN_LEFT,
+      linefeed: 1
+    ));
+  }
+
+  return list;
+}
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -160,50 +250,125 @@ class MyAppState extends State<MyApp> {
 
                           List<LineText> list = [];
 
-                          // Start with a clean format
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: '\n',linefeed: 1));
+                        // Add header
+                        list.add(LineText(
+                          type: LineText.TYPE_TEXT,
+                          content: 'JOB ORDER',                     
+                          weight: 5,
+                          align: LineText.ALIGN_CENTER,
+                          fontZoom: 2,
+                          linefeed: 1
+                        ));                                       
 
-                          // Header
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: 'UROVO TEST RECEIPT',weight: 1,align: LineText.ALIGN_CENTER,fontZoom: 2,  linefeed: 1));
+                          list.add(
+                            LineText(type: LineText.TYPE_TEXT,content: 'JO-241012-778',align: LineText.ALIGN_CENTER,x: 0,  y: 120,linefeed: 1),
+                          );
 
-                          // Date/Time
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: DateTime.now().toString().substring(0, 19),align: LineText.ALIGN_CENTER,linefeed: 1));
+                        // Add separator
+                        list.add(LineText(type: LineText.TYPE_TEXT,content: '------------------------------------------------',align: LineText.ALIGN_CENTER,linefeed: 1));
 
-                          // Separator
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: '================================================',align: LineText.ALIGN_CENTER,linefeed: 1));
+                      // // Get and add header layout
+                        List<LineText> headerLayout = await getReceiptLayout(receiptData);
+                        list.addAll(headerLayout);  // Add the header layout to main list
+                        
+                        // Add separator
+                        list.add(LineText(type: LineText.TYPE_TEXT,content: '------------------------------------------------',align: LineText.ALIGN_CENTER,linefeed: 1));
 
-                          // Test content
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: 'Item 1 - ',align: LineText.ALIGN_LEFT,linefeed: 0 ));
+                        // Categories header
+                        list.add(LineText(type: LineText.TYPE_TEXT,content: 'Categories',weight: 1,align: LineText.ALIGN_CENTER,linefeed: 1));
 
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: '10.00',align: LineText.ALIGN_RIGHT,linefeed: 1 ));
+                        // Textile section
+                        list.add(
+                          LineText(type: LineText.TYPE_TEXT,content:  'TEXTILE',weight: 1,align: LineText.ALIGN_LEFT,linefeed: 1));
+                          list.add(LineText(type: LineText.TYPE_TEXT,content: 'Qty',weight: 1,align: LineText.ALIGN_LEFT,linefeed: 1 ,relativeX: 540));
+
+                        // Sample textile items
+                        list.addAll([
+                          LineText(type: LineText.TYPE_TEXT, content: 'Item 1                                        5', align: LineText.ALIGN_LEFT, linefeed: 1),
+                          LineText(type: LineText.TYPE_TEXT, content: 'Item 2                                        3', align: LineText.ALIGN_LEFT, linefeed: 1),
+                        ]);
+
+                        // Add separator
+                        list.add(LineText(type: LineText.TYPE_TEXT,content: '------------------------------------------------',align: LineText.ALIGN_CENTER,linefeed: 1));
+
+                        // Uniform section
+                        list.add(LineText(type: LineText.TYPE_TEXT,content: 'UNIFORM',weight: 1,align: LineText.ALIGN_LEFT,linefeed: 1));
+                        list.add(LineText(type: LineText.TYPE_TEXT,content: 'Qty',weight: 1,align: LineText.ALIGN_LEFT,linefeed: 1 ,relativeX: 540));
+                        // Sample uniform items
+                        list.addAll([
+                          LineText(type: LineText.TYPE_TEXT, content: 'Uniform 1                                      2', align: LineText.ALIGN_LEFT, linefeed: 1),
+                          LineText(type: LineText.TYPE_TEXT, content: 'Uniform 2                                      4', align: LineText.ALIGN_LEFT, linefeed: 1),
+                        ]);
+
+                        // Add separator
+                        list.add(LineText(type: LineText.TYPE_TEXT,content: '------------------------------------------------',align: LineText.ALIGN_CENTER,linefeed: 1));
+
+
+                        // Linens section
+                        list.add(LineText(type: LineText.TYPE_TEXT,content: 'LINENS',weight: 1,align: LineText.ALIGN_LEFT,linefeed: 1));
+                       
+                        list.add(LineText(type: LineText.TYPE_TEXT,content: 'Qty',weight: 1,align: LineText.ALIGN_LEFT,linefeed: 1 ,relativeX: 540));
+
+                        // Sample linen items
+                        list.addAll([
+                          LineText(type: LineText.TYPE_TEXT, content: 'Linen 1                                        3', align: LineText.ALIGN_LEFT, linefeed: 1),
+                          LineText(type: LineText.TYPE_TEXT, content: 'Linen 2                                        2', align: LineText.ALIGN_LEFT, linefeed: 1),
+                        ]);
+
+                        // Total
+                        list.addAll([
+                          LineText(type: LineText.TYPE_TEXT, content: '------------------------------------------------', align: LineText.ALIGN_CENTER, linefeed: 1),
+                          LineText(type: LineText.TYPE_TEXT, content: 'TOTAL                                         19', weight: 1, align: LineText.ALIGN_LEFT, linefeed: 1),
+                          LineText(type: LineText.TYPE_TEXT, content: '------------------------------------------------', align: LineText.ALIGN_CENTER, linefeed: 1),
+                        ]);
+
+
+                
+
+                          // // Start with a clean format
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: '\n',linefeed: 1));
+
+                          // // Header
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: 'UROVO TEST RECEIPT',weight: 1,align: LineText.ALIGN_CENTER,fontZoom: 2,  linefeed: 1));
+
+                          // // Date/Time
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: DateTime.now().toString().substring(0, 19),align: LineText.ALIGN_CENTER,linefeed: 1));
+
+                          // // Separator
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: '================================================',align: LineText.ALIGN_CENTER,linefeed: 1));
+
+                          // // Test content
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: 'Item 1 - ',align: LineText.ALIGN_LEFT,linefeed: 0 ));
+
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: '10.00',align: LineText.ALIGN_RIGHT,linefeed: 1 ));
                           
-                          // Spacing
-                          list.add(LineText(linefeed: 1));
+                          // // Spacing
+                          // list.add(LineText(linefeed: 1));
 
-                          // QR Code
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: 'QR Code:',align: LineText.ALIGN_CENTER,linefeed: 1));
+                          // // QR Code
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: 'QR Code:',align: LineText.ALIGN_CENTER,linefeed: 1));
 
-                          list.add(LineText(type: LineText.TYPE_QRCODE,content: 'https://example.com',size: 200,align: LineText.ALIGN_CENTER,linefeed: 1));
+                          // list.add(LineText(type: LineText.TYPE_QRCODE,content: 'https://example.com',size: 200,align: LineText.ALIGN_CENTER,linefeed: 1));
 
-                          // Another barcode type (Code 39)
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: 'Product Barcode:',align: LineText.ALIGN_CENTER,linefeed: 1));
+                          // // Another barcode type (Code 39)
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: 'Product Barcode:',align: LineText.ALIGN_CENTER,linefeed: 1));
 
-                          list.add(LineText(type: LineText.TYPE_BARCODE,content: 'PROD123456',size: 68,align: LineText.ALIGN_CENTER,linefeed: 1));
+                          // list.add(LineText(type: LineText.TYPE_BARCODE,content: 'PROD123456',size: 68,align: LineText.ALIGN_CENTER,linefeed: 1));
 
-                          // Spacing before QR
-                          list.add(LineText(linefeed: 1));
+                          // // Spacing before QR
+                          // list.add(LineText(linefeed: 1));
 
-                          // QR Code with adjusted settings
-                          list.add(LineText(type: LineText.TYPE_QRCODE,content: 'https://www.google.com',  align: LineText.ALIGN_CENTER,size: 8,linefeed: 1));
+                          // // QR Code with adjusted settings
+                          // list.add(LineText(type: LineText.TYPE_QRCODE,content: 'https://www.google.com',  align: LineText.ALIGN_CENTER,size: 8,linefeed: 1));
 
-                          // Text below QR code
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: 'Scan Me!',align: LineText.ALIGN_CENTER,linefeed: 1));
+                          // // Text below QR code
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: 'Scan Me!',align: LineText.ALIGN_CENTER,linefeed: 1));
                           
-                          // Footer
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: '================================================',align: LineText.ALIGN_CENTER,linefeed: 1));
+                          // // Footer
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: '================================================',align: LineText.ALIGN_CENTER,linefeed: 1));
 
-                          // End with multiple line feeds for paper cutting
-                          list.add(LineText(type: LineText.TYPE_TEXT,content: '\n', linefeed: 1));
+                          // // End with multiple line feeds for paper cutting
+                          // list.add(LineText(type: LineText.TYPE_TEXT,content: '\n', linefeed: 1));
 
                           try {
                             // Print sequence with error handling
@@ -258,11 +423,13 @@ class MyAppState extends State<MyApp> {
                               try {
                                 await bluetoothPrint.printReceipt(
                                   {'width': 380, 'height': 0},
-                                  [LineText(
+                                  [
+                                    LineText(
                                     type: LineText.TYPE_TEXT,
                                     content: 'Connection Test\n\n\n',
                                     align: LineText.ALIGN_CENTER,
                                     linefeed: 1
+
                                   )]
                                 );
                               } catch (e) {
